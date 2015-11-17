@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
@@ -20,11 +21,11 @@ namespace GameOfLife
         private Random _random = new Random();
 
         private WebServiceController wsc = new WebServiceController();
-
+        
         private const int CELLS_IN_ROW = 10;
         private const int CELLS_IN_COLUMN = 10;
         private const int CELLS_AMOUNT = CELLS_IN_COLUMN * CELLS_IN_ROW;
-        private Int32Rect sourceRect = new Int32Rect(0, 0, CELLS_IN_ROW, CELLS_IN_COLUMN);
+        private Int32Rect _sourceRect = new Int32Rect(0, 0, CELLS_IN_ROW, CELLS_IN_COLUMN);
         private int _sourceBufferStride = 0;
 
         public MainWindow()
@@ -33,7 +34,7 @@ namespace GameOfLife
 
             DataContext = this;
 
-            Bitmap = new WriteableBitmap(CELLS_IN_ROW, CELLS_IN_COLUMN, 96, 96, PixelFormats.Gray8, BitmapPalettes.BlackAndWhite);
+            Bitmap = new WriteableBitmap(CELLS_IN_ROW, CELLS_IN_COLUMN, 96, 96, PixelFormats.Gray8, BitmapPalettes.Gray256);
             RenderOptions.SetBitmapScalingMode(Image, BitmapScalingMode.NearestNeighbor);
             _sourceBufferStride = CELLS_IN_ROW * Bitmap.Format.BitsPerPixel / 8;
 
@@ -48,57 +49,81 @@ namespace GameOfLife
             {
                 bytes[i] = (byte)(_random.Next(0, 2) * 255);
             }
+            //bytes = new byte[] {0, 0, 0, 255, 255, 0, 0, 255, 0};
             FillBitmap(bytes);
 
             //Run the game
             while (true)
             {
-                bytes = RequestNextGeneration(bytes);
+                //await Task.Delay(10);
+
+
+                await Task.Run(() => RequestNextGeneration(bytes));
                 FillBitmap(bytes);
-                await Task.Delay(10);
             }
         }
 
-        private byte[] RequestNextGeneration(byte[] bytes)
+        private void RequestNextGeneration(byte[] bytes)
         {
-            //Transform byte[] into string[] and add row number in the beginning of each string
-            var cellStrings = new string[CELLS_IN_COLUMN]; //Row example: 50011001100
+            //Transform byte values from 255 to 1
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                bytes[i] /= 255;
+            }
+
+            //Transform byte[] into string[]
+            string postData = "[";
             for (int i = 0; i < CELLS_IN_COLUMN; i++)
             {
-                cellStrings[i] = i.ToString();
+                postData += "[";
                 for (int j = 0; j < CELLS_IN_ROW; j++)
                 {
-                    int index = j + i * CELLS_IN_ROW;
-                    cellStrings[i] += bytes[index] / 255;
+                    var b = bytes[j + i * CELLS_IN_ROW];
+                    postData += j == CELLS_IN_ROW - 1 ? b + "" : b + ",";
+
+                }
+                postData += i == CELLS_IN_COLUMN - 1 ? "]" : "],";
+            }
+            postData += "]";
+
+            //Request next generation
+            byte[,] nextGen = wsc.Request(postData);
+
+            //Uncomment this to see a random behaviour without using web service (to test speed)
+//                        byte[,] nextGen = new byte[CELLS_IN_ROW, CELLS_IN_COLUMN];
+//                        for (int i = 0; i < CELLS_IN_ROW; i++)
+//                        {
+//                            for (int j = 0; j < CELLS_IN_COLUMN; j++)
+//                            {
+//                                nextGen[i, j] = (byte)_random.Next(0, 2);
+//                            }
+//                        }
+            
+            //Transform byte values from 1 to 255
+            for (int i = 0; i < CELLS_IN_ROW; i++)
+            {
+                for (int j = 0; j < CELLS_IN_COLUMN; j++)
+                {
+                    nextGen[i, j] *= 255;
                 }
             }
 
-            //Request next generation
-            byte[,] nextGen = wsc.Request(cellStrings);
-
-            //Uncomment this to see a random behaviour without using web service
-//            byte[,] nextGen = new byte[CELLS_IN_ROW, CELLS_IN_COLUMN + 1];
-//            for (int i = 0; i < CELLS_IN_ROW; i++)
-//            {
-//                for (int j = 0; j < CELLS_IN_COLUMN + 1; j++)
-//                {
-//                    nextGen[i, j] = (byte)(_random.Next(0, 2)*255);
-//                }
-//            }
-
-            //Transform byte[,] into byte[] and remove first element from every row
-            List<byte> nextList = nextGen.Cast<byte>().ToList();
-            for (int i = 0; i < CELLS_IN_ROW; i++)
-            {
-                nextList.RemoveAt(i * CELLS_IN_ROW);
-            }
-
-            return nextList.Cast<byte>().ToArray();
+            //Transform byte[,] into byte[]
+            nextGen.Cast<byte>().ToArray().CopyTo(bytes, 0);
         }
 
         private void FillBitmap(byte[] sourceBytes)
         {
-            Bitmap.WritePixels(sourceRect, sourceBytes, _sourceBufferStride, 0);
+            //sourceBytes = new byte[] {0, 255, 0,  255, 0, 255, 0,  255, 0};
+            Bitmap.WritePixels(_sourceRect, sourceBytes, _sourceBufferStride, 0);
+//            OnPropertyChanged(nameof(Bitmap));
+//            UpdateLayout();
+
+//            sourceBytes = new byte[] {0, 255, 0, 0, 255, 0, 255, 0, 0, 255, 0, 0};
+//            Bitmap.Lock();
+//            Marshal.Copy(sourceBytes, 0, Bitmap.BackBuffer, sourceBytes.Length);
+//            Bitmap.AddDirtyRect(_sourceRect);
+//            Bitmap.Unlock();
         }
 
         public WriteableBitmap Bitmap

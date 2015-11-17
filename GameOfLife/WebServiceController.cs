@@ -6,17 +6,27 @@ using Newtonsoft.Json;
 
 namespace GameOfLife
 {
-    //TODO 
     class WebServiceController
     {
-        public byte[,] Request(string[] cells)
+        public byte[,] Request(string postData)
         {
+
+
             string url = "http://game-of-life-ws.herokuapp.com/next";
             WebRequest request = WebRequest.Create(url);
             request.Method = "POST";
 
             ///TODO input parameter
-            string postData = "This is a test that posts this string to a Web server.";
+//            string postData = "[[1,0,0,1,0,1,1,0,1,1]," +
+//                              "[1,0,0,1,0,1,1,0,1,1]," +
+//                              "[1,0,0,1,0,1,1,0,1,1]," +
+//                              "[1,0,0,1,0,1,1,0,1,1]," +
+//                              "[1,0,0,1,0,1,1,0,1,1]," +
+//                              "[1,0,0,1,0,1,1,0,1,1]," +
+//                              "[1,0,0,1,0,1,1,0,1,1]," +
+//                              "[1,0,0,1,0,1,1,0,1,1]," +
+//                              "[1,0,0,1,0,1,1,0,1,1]," +
+//                              "[1,0,0,1,0,1,1,0,1,1]]";
 
             byte[] byteArray = Encoding.UTF8.GetBytes(postData);
             // Set the ContentType property of the WebRequest.

@@ -5,7 +5,7 @@
         Background="Black">
     <Grid>
         <Viewbox>
-            <Image Name="Image" Source="{Binding Bitmap}"/>
+            <Image Name="Image" Source="{Binding Bitmap, Mode=TwoWay}"/>
         </Viewbox>
     </Grid>
 </Window>
